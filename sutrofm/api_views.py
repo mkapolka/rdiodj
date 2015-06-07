@@ -6,7 +6,7 @@ from django.http import HttpResponse, HttpResponseNotFound, HttpResponseBadReque
 from django.http import JsonResponse
 from redis import ConnectionPool, StrictRedis
 
-from sutrofm.redis_models import Party, User, Messages, ChatMessage
+from sutrofm.redis_models import Party, User, Messages, ChatMessage, FavoriteMessage
 
 
 redis_connection_pool = ConnectionPool(**settings.WS4REDIS_CONNECTION)
@@ -96,7 +96,7 @@ def post_message(request, party_id):
     message = ChatMessage(user, body, datetime.utcnow())
   elif message_type == 'favorite':
     track_id = request.POST.get('trackId')
-    message = ChatMessage(user, track_id, datetime.utcnow())
+    message = FavoriteMessage(user, track_id, datetime.utcnow())
   else:
     return HttpResponseBadRequest()
 
