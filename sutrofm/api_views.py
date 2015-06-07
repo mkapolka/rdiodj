@@ -5,6 +5,8 @@ from django.http import HttpResponse, HttpResponseNotFound
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from redis import ConnectionPool, StrictRedis
+from ws4redis.publisher import RedisPublisher
+from ws4redis.redis_store import RedisMessage
 
 from sutrofm.redis_models import Party, User, Messages
 
@@ -70,19 +72,16 @@ def get_user_by_id(request, user_id):
   return JsonResponse(data)
 
 
-@csrf_exempt
-def messages(request, room_id):
+def messages(request, party_id):
   if request.method == "POST":
-    post_message(request)
+    post_message(request, party_id)
 
   redis = StrictRedis(connection_pool=redis_connection_pool)
-  messages = Messages.get_recent(redis, room_id)
+  messages = Messages.get_recent(redis, party_id)
 
   return JsonResponse({'results': messages})
 
-
-def post_message(request):
-  party_id = request.POST.get('partyId')  # TODO This should come from the url
+def post_message(request, party_id):
   message = request.POST.get('message')
   message_type = request.POST.get('messageType')
   user = request.POST.get('userId')  # TODO this should come from the session
@@ -90,5 +89,9 @@ def post_message(request):
   m = Messages()
   redis = StrictRedis(connection_pool=redis_connection_pool)
   m.save_message(redis, message, message_type, user, party_id)
+
+  redis_publisher = RedisPublisher(facility=party_id, broadcast=True)
+  redis_message = RedisMessage(message)  # TODO format correctly. This is the message's text only
+  redis_publisher.publish_message(redis_message)
 
   return HttpResponse(status=httplib.CREATED)
