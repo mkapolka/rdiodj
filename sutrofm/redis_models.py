@@ -133,31 +133,31 @@ class User(object):
 
 
 class ChatMessage(object):
-  def __init__(self, sender_id, body, timestamp):
+  def __init__(self, user_id, body, timestamp):
     self.type = 'chat'
-    self.sender_id = sender_id
+    self.user_id = user_id
     self.body = body
     self.timestamp = timestamp
 
   def __dict__(self):
     return {
       'type': self.type,
-      'sender_id': self.sender_id,
+      'user_id': self.user_id,
       'body': self.body,
       'timestamp': self.timestamp,
     }
 
 class FavoriteMessage(object):
-  def __init__(self, sender_id, track_id, timestamp):
+  def __init__(self, user_id, track_id, timestamp):
     self.type = 'chat'
-    self.sender_id = sender_id
+    self.user_id = user_id
     self.track_id = track_id
     self.timestamp = timestamp
 
   def __dict__(self):
     return {
       'type': self.type,
-      'sender_id': self.sender_id,
+      'user_id': self.user_id,
       'track_id': self.track_id,
       'timestamp': self.timestamp,
     }
