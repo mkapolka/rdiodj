@@ -3,6 +3,8 @@ import uuid
 
 from dateutil import parser
 import simplejson as json
+from ws4redis.publisher import RedisPublisher
+from ws4redis.redis_store import RedisMessage
 
 
 class Party(object):
@@ -130,20 +132,55 @@ class User(object):
     connection.sadd('users', self.id)
 
 
+class ChatMessage(object):
+  def __init__(self, sender_id, body, timestamp):
+    self.type = 'chat'
+    self.sender_id = sender_id
+    self.body = body
+    self.timestamp = timestamp
+
+  def __dict__(self):
+    return {
+      'type': self.type,
+      'sender_id': self.sender_id,
+      'body': self.body,
+      'timestamp': self.timestamp,
+    }
+
+class FavoriteMessage(object):
+  def __init__(self, sender_id, track_id, timestamp):
+    self.type = 'chat'
+    self.sender_id = sender_id
+    self.track_id = track_id
+    self.timestamp = timestamp
+
+  def __dict__(self):
+    return {
+      'type': self.type,
+      'sender_id': self.sender_id,
+      'track_id': self.track_id,
+      'timestamp': self.timestamp,
+    }
+
+
 class Messages(object):
   @staticmethod
-  def get_recent(connection, party_messages_id, count=50):
-    messages = connection.lrange('messages:%s' % party_messages_id, 0, count)
+  def _build_redis_key(party_id):
+    return 'messages:%s' % party_id
+
+  @staticmethod
+  def get_recent(connection, party_id, offset=0, limit=50):
+    messages = connection.lrange(Messages._build_redis_key(party_id), offset, limit)
     return messages
 
-  def save_message(self, connection, message, message_type, user, party_id):
-    if not hasattr(self, 'party_messages_id'):
-      self.party_messages_id = party_id
+  @staticmethod
+  def save_message(connection, message, party_id):
+    connection.lpush(Messages._build_redis_key(party_id), message)
 
-    connection.lpush("messages:%s" % self.party_messages_id, {
-      "message": message,
-      "type": message_type,
-      "user": user,
-      "timestamp": datetime.datetime.utcnow()
-    })
+  @staticmethod
+  def broadcast(party_id, message):
+    redis_publisher = RedisPublisher(facility=party_id, broadcast=True)
+    redis_message = RedisMessage(json.dumps(message))
+    redis_publisher.publish_message(redis_message)
+
 

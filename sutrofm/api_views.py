@@ -1,14 +1,12 @@
 import httplib
+from datetime import datetime
 
 from django.conf import settings
-from django.http import HttpResponse, HttpResponseNotFound
-from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, HttpResponseNotFound, HttpResponseBadRequest, HttpResponseForbidden
 from django.http import JsonResponse
 from redis import ConnectionPool, StrictRedis
-from ws4redis.publisher import RedisPublisher
-from ws4redis.redis_store import RedisMessage
 
-from sutrofm.redis_models import Party, User, Messages
+from sutrofm.redis_models import Party, User, Messages, ChatMessage
 
 
 redis_connection_pool = ConnectionPool(**settings.WS4REDIS_CONNECTION)
@@ -81,17 +79,28 @@ def messages(request, party_id):
 
   return JsonResponse({'results': messages})
 
+
 def post_message(request, party_id):
-  message = request.POST.get('message')
-  message_type = request.POST.get('messageType')
-  user = request.POST.get('userId')  # TODO this should come from the session
+  if not request.user.is_authenticated():
+    return HttpResponseForbidden()
 
-  m = Messages()
   redis = StrictRedis(connection_pool=redis_connection_pool)
-  m.save_message(redis, message, message_type, user, party_id)
+  if not Party.get(redis, party_id):
+    return HttpResponseNotFound()
 
-  redis_publisher = RedisPublisher(facility=party_id, broadcast=True)
-  redis_message = RedisMessage(message)  # TODO format correctly. This is the message's text only
-  redis_publisher.publish_message(redis_message)
+  message_type = request.POST.get('messageType')
+
+  user = request.user.id
+  if message_type == 'chat':
+    body = request.POST.get('message')
+    message = ChatMessage(user, body, datetime.utcnow())
+  elif message_type == 'favorite':
+    track_id = request.POST.get('trackId')
+    message = ChatMessage(user, track_id, datetime.utcnow())
+  else:
+    return HttpResponseBadRequest()
+
+  Messages.save_message(redis, message, party_id)
+  Messages.broadcast(party_id, message)
 
   return HttpResponse(status=httplib.CREATED)
